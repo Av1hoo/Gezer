@@ -7,14 +7,23 @@ from selenium.webdriver.firefox.options import Options
 import os
 import threading
 
+# get from config file the path to download the file to
+try:
+    with open("config.txt", "r") as f:
+        path = f.readlines()[3].strip()
+except FileNotFoundError:
+    path = os.path.expanduser("~") + "\\Downloads"
 
-# get number of files in downloads folder
-path = os.path.expanduser("~") + "\\Downloads"
 before = len(os.listdir(path))
 
 # Create a new instance of the Firefox driver
 options = Options()
 options.add_argument('-headless')
+# set the path to download the file to path
+options.set_preference("browser.download.dir", path)
+options.set_preference("browser.download.folderList", 2)
+options.set_preference("browser.download.manager.showWhenStarting", False)
+options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
 
 driver = webdriver.Firefox(options=options)
 
@@ -61,21 +70,14 @@ encoded = base64.b64encode(new_string.encode('utf-8')).decode('utf-8')
 # change the name of the button
 driver.execute_script(f"arguments[0].setAttribute('value', '{encoded}')", button)
 
-def download_file():
-    button = driver.find_element(By.NAME, "toopen:2:1")
-    button.click()
-    print("Downloading...")
-
-# Start download in a separate thread
-download_thread = threading.Thread(target=download_file)
-download_thread.start()
-
+button = driver.find_element(By.NAME, "toopen:2:1")
+button.click()
+print("Downloading...")
 
 after = len(os.listdir(path))
-while after > before:
+while after == before:
     after = len(os.listdir(path))
 # Wait for download thread to finish
-download_thread.join() 
 driver.quit()
 print("Done")
 # get the latest downloaded file
