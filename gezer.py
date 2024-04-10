@@ -1,11 +1,9 @@
 import base64
 import subprocess
-import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 import os
-import threading
 from selenium.common.exceptions import NoSuchElementException
 
 def set_up():
@@ -57,44 +55,50 @@ def login(driver, default_config, path, before):
             lines = f.readlines()
             username.send_keys(lines[0].strip())
             password.send_keys(lines[1].strip())
+            ID = lines[2].strip()
             id.send_keys(lines[2].strip())
     except FileNotFoundError:
         username.send_keys(input("Enter username: "))
         password.send_keys(input("Enter password: "))
-        id.send_keys(int(input("Enter id: ")))
+        ID = int(input("Enter id: "))
+        id.send_keys(str(ID))
 
     # click submit
     submit = driver.find_element(By.NAME, "ok")
     submit.click()
-    go_to_download(driver, path, before)
+    go_to_download(driver, path, before, ID)
     
-def go_to_download(driver, path, before):
+def go_to_download(driver, path, before, ID):
     try:
         # get the list of the course and print it
-        # xPath for number = /html/body/form[2]/table/tbody/tr[2]/th/span
-        # xPath for name = /html/body/form[2]/table/tbody/tr[2]/td[1]/span
-        # print from tr[2] until the end of the table
         courses_set = []
-        for i in range(2, 100):
+        for j in range(2, 20):
             try:
-                number = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/th/span").text
-                name = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[1]/span").text
-                date = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[4]/span").text
-                try:
-                    scaned = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[6]/input").get_attribute("value")
-                except NoSuchElementException:
-                    scaned = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[6]/span").text
-                # flip the name string
-                name = name[::-1]
-                if date == "מיוחד":
-                    date = "ג'" 
-                date = date[::-1]
-                scaned = scaned[::-1]
-                # add the 3 as tuple
-                courses_set.append((date, name, number, scaned))
-            except NoSuchElementException:
-                print(f"{i} End of courses")
-                break
+                for i in range(2, 20):
+                    semster = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/caption/span").text
+                    semster = semster[-2:-1]
+                    number = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/th/span").text
+                    name = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/td[1]/span").text
+                    preiod = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/td[3]/span").text
+                    date = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/td[4]/span").text
+                    year = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/td[5]/span").text
+                    year = year[-4:]
+                    try:
+                        scaned = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/td[6]/input").get_attribute("value")
+                    except NoSuchElementException:
+                        scaned = driver.find_element(By.XPATH, f"/html/body/form[{j}]/table/tbody/tr[{i}]/td[6]/span").text
+                    # flip the name string
+                    if "המחברת טרם נסרקה" == scaned or scaned == "הבחינה טרם התקיימה":
+                        continue
+                    name = name[::-1]
+                    if date == "מיוחד":
+                        date = "ג'" 
+                    date = date[::-1]
+                    scaned = scaned[::-1]
+                    # add the 3 as tuple
+                    courses_set.append((date, name, number, scaned, year, preiod, semster))
+            except NoSuchElementException as e:
+                pass
         print("Courses:")
         max_date_len = max([len(course[0]) for course in courses_set])
         max_name_len = max([len(course[1]) for course in courses_set])
@@ -126,20 +130,35 @@ def go_to_download(driver, path, before):
 
             print("||", " "*date_padding + date_str + " "*date_padding, "||", " "*name_padding + name_str + " "*name_padding, "||",
                    " "*course_padding + course_str + " "*course_padding, "||", " "*scaned_padding + scaned_str + " "*scaned_padding, "||")
-
-        course = int(input("\nEnter the number of the course you want to download: "))
+        try:
+            course = int(input("\nEnter the number of the course you want to download: (-1 to previous courses, 0 to exit) "))
+        except KeyboardInterrupt:
+            driver.quit()
+            return
+        if course == 0:
+            try:
+                driver.quit()
+            except:
+                pass
+            return
+        elif course == -1:
+            # click on previous courses
+            button = driver.find_element(By.XPATH, "/html/body/a[1]/span")
+            button.click()
+            go_to_download(driver, path, before, ID)
+            return 
         course_to_change = courses_set[course-1]
         # look for button with value "קובץ המחברת" and edit its name and then click it
         button = driver.find_element(By.XPATH, "//input[@value='קובץ המחברת']")
         button.click()
-        change_and_download(driver, path, before, course_to_change)
+        return change_and_download(driver, path, before, course_to_change, ID)
     except NoSuchElementException:
         print("Wrong username or password, please try again")
         driver.quit()
         set_up()
     
 
-def change_and_download(driver, path, before, course_to_change):
+def change_and_download(driver, path, before, course_to_change, ID):
     # find toopen:2:1 name button
     button = driver.find_element(By.NAME, "expars")
     old_val = button.get_attribute("value")
@@ -148,19 +167,40 @@ def change_and_download(driver, path, before, course_to_change):
     decoded_bytes = base64.b64decode(old_val)
     # convert bytes to string
     new_string = decoded_bytes.decode('utf-8')
-    course_number = course_to_change[2]
-    course_date = course_to_change[1]
-    new_string = new_string[0:-12] + str(course_number) + new_string[-4:]
-    if 'א' in course_date:
-        new_string = new_string[0:-1] + "1"
-    elif 'ב' in course_date:
-        new_string = new_string[0:-1] + "2"
-    elif 'ג' in course_date:
-        new_string = new_string[0:-1] + "3"
-    elif '1' in course_date:
-        new_string = new_string[0:-1] + "11"
-    elif '2' in course_date:
-        new_string = new_string[0:-1] + "12"
+
+    type1 = ""
+    type3 = "1"
+    semster = course_to_change[6]
+    if semster == "א":
+        semster = ":1:0:"
+        type1 = "1:"
+    elif semster == "ב":
+        semster = ":2:0:"
+        type1 = "2:"
+    elif semster == "י":
+        semster = ":3:0:"
+        type1 = "4:"
+    
+    prieod = course_to_change[5]
+    if 'ה' in prieod:
+        type1 = "4:"
+        type3 = "3"
+
+    date = course_to_change[0]
+    if 'א' in date:
+        type2 = "1"
+    elif '1' in date:
+        type2 = "11"
+    elif '2' in date:
+        type2 = "12"
+    elif 'ב' in date:
+        type2 = "2"
+    elif 'ג' in date:
+        type2 = "3"
+      
+    # ID : Year : Semester : 0 : type : Course Number : Course Date : type2
+    new_string = ID + ":" + course_to_change[4] + semster + type1 + course_to_change[2] + ":" + type3 + ":" + type2
+
     # encode the string to base64
     encoded = base64.b64encode(new_string.encode('utf-8')).decode('utf-8') 
     # change the name of the button

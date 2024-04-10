@@ -1,1 +1,17 @@
 icon.ico
+gezer.spec
+build/gezer/Analysis-00.toc
+build/gezer/base_library.zip
+build/gezer/EXE-00.toc
+build/gezer/gezer.pkg
+build/gezer/PKG-00.toc
+build/gezer/PYZ-00.pyz
+build/gezer/PYZ-00.toc
+build/gezer/warn-gezer.txt
+build/gezer/xref-gezer.html
+build/gezer/localpycs/pyimod01_archive.pyc
+build/gezer/localpycs/pyimod02_importers.pyc
+build/gezer/localpycs/pyimod03_ctypes.pyc
+build/gezer/localpycs/pyimod04_pywin32.pyc
+build/gezer/localpycs/struct.pyc
+dist/gezer.exe
