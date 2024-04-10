@@ -70,36 +70,105 @@ def login(driver, default_config, path, before):
     
 def go_to_download(driver, path, before):
     try:
+        # get the list of the course and print it
+        # xPath for number = /html/body/form[2]/table/tbody/tr[2]/th/span
+        # xPath for name = /html/body/form[2]/table/tbody/tr[2]/td[1]/span
+        # print from tr[2] until the end of the table
+        courses_set = []
+        for i in range(2, 100):
+            try:
+                number = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/th/span").text
+                name = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[1]/span").text
+                date = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[4]/span").text
+                try:
+                    scaned = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[6]/input").get_attribute("value")
+                except NoSuchElementException:
+                    scaned = driver.find_element(By.XPATH, f"/html/body/form[2]/table/tbody/tr[{i}]/td[6]/span").text
+                # flip the name string
+                name = name[::-1]
+                if date == "מיוחד":
+                    date = "ג'" 
+                date = date[::-1]
+                scaned = scaned[::-1]
+                # add the 3 as tuple
+                courses_set.append((date, name, number, scaned))
+            except NoSuchElementException:
+                print(f"{i} End of courses")
+                break
+        print("Courses:")
+        max_date_len = max([len(course[0]) for course in courses_set])
+        max_name_len = max([len(course[1]) for course in courses_set])
+        max_course_len = max([len(course[2]) for course in courses_set])
+        max_scaned_len = max([len(course[3]) for course in courses_set])
+        for i in range(len(courses_set)):
+            if i < 9:
+                print(f"[{i+1}] ", end=" ")
+            else:
+                print(f"[{i+1}]", end=" ")
+            date_str = courses_set[i][0]
+            name_str = str(courses_set[i][1])
+            course_str = str(courses_set[i][2])
+            scaned_str = str(courses_set[i][3])
+            # if len is odd add space at the end
+            if len(date_str) % 2 != 0:
+                date_str += " "
+            if len(name_str) % 2 != 0:
+                name_str += " "
+            if len(course_str) % 2 != 0:
+                course_str += " "
+            if len(scaned_str) % 2 != 0:
+                scaned_str += " "
+            date_padding = (max_date_len - len(date_str)) // 2
+            name_padding = (max_name_len - len(name_str)) // 2
+            course_padding = (max_course_len - len(course_str)) // 2
+            scaned_padding = (max_scaned_len - len(scaned_str)) // 2
+            
+
+            print("||", " "*date_padding + date_str + " "*date_padding, "||", " "*name_padding + name_str + " "*name_padding, "||",
+                   " "*course_padding + course_str + " "*course_padding, "||", " "*scaned_padding + scaned_str + " "*scaned_padding, "||")
+
+        course = int(input("\nEnter the number of the course you want to download: "))
+        course_to_change = courses_set[course-1]
         # look for button with value "קובץ המחברת" and edit its name and then click it
         button = driver.find_element(By.XPATH, "//input[@value='קובץ המחברת']")
         button.click()
-        change_and_download(driver, path, before)
+        change_and_download(driver, path, before, course_to_change)
     except NoSuchElementException:
         print("Wrong username or password, please try again")
         driver.quit()
         set_up()
     
 
-def change_and_download(driver, path, before):
+def change_and_download(driver, path, before, course_to_change):
     # find toopen:2:1 name button
     button = driver.find_element(By.NAME, "expars")
     old_val = button.get_attribute("value")
 
     # decode old_val from base64
     decoded_bytes = base64.b64decode(old_val)
-
     # convert bytes to string
     new_string = decoded_bytes.decode('utf-8')
-    new_string = new_string[0:-12] + input("New course number: ") + new_string[-4:]
+    course_number = course_to_change[2]
+    course_date = course_to_change[1]
+    new_string = new_string[0:-12] + str(course_number) + new_string[-4:]
+    if 'א' in course_date:
+        new_string = new_string[0:-1] + "1"
+    elif 'ב' in course_date:
+        new_string = new_string[0:-1] + "2"
+    elif 'ג' in course_date:
+        new_string = new_string[0:-1] + "3"
+    elif '1' in course_date:
+        new_string = new_string[0:-1] + "11"
+    elif '2' in course_date:
+        new_string = new_string[0:-1] + "12"
     # encode the string to base64
     encoded = base64.b64encode(new_string.encode('utf-8')).decode('utf-8') 
-
     # change the name of the button
     driver.execute_script(f"arguments[0].setAttribute('value', '{encoded}')", button)
 
     button = driver.find_element(By.NAME, "toopen:2:1")
     button.click()
-    print("Downloading...")
+    print(f"Downloading {course_to_change[1]} דעומ {course_to_change[0]} ...")
     check_if_downloaded(driver, path, before)
 
 def check_if_downloaded(driver, path, before):
